@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+fs = require('fs')
+emmet = require('emmet')
+process = require('process')
+argv = require('minimist')(process.argv.slice(2));
+
+////////////////////helper fns////////////////////
+// two fns for counting single line nest tokens (div.a>div.b^div.c)
+countChar   = (str,a) => { var n=0; for(var i in str) if(str[i]==a) n++; return n; }
+countTokens = (str,a) => 
+  countChar(
+  (""+str)  // hack: dont count >^ in quotes or curlys
+  .replace(/[^\\]?".+?[^\\]"/g)
+  .replace(/[^\\]?'.+?[^\\]'/g)
+  .replace(/[^\\]?\{.+?[^\\]\}/g)
+  , a)
+// # actual tabs and spaces at the start of the line
+getTabLevel = (str,boolTwoSpaceTabs) => {
+  try {
+  if (!boolTwoSpaceTabs)
+    str=str.replace(/    /g,"\t")
+  return str.replace(/  /g,"\t").match(/^\t+/)[0].length // # of tabs before text
+  } catch (e) {
+  return 0 // default is zero
+  }
+}
+
+
+// parse
+parseFile = (filename) => {
+  var data = ""
+  try {
+    data = fs.readFileSync(filename, 'UTF-8')
+  } catch (e) {
+    return console.log("error reading file '"+filename+"'")
+  }
+  parse(data, filename)
+}
+
+parse = (str,filename) => {
+  // escape $. ex: \$varname
+  var data = str.replace(/\\\$/g,"NOREP_VAR")
+
+  //make `^>+` out of tabs (normally emmet does nesting like "div.a>div.b" and unnesting like "div.b^div.a_sibling", now we can use tabs)
+  var hasTwoSpaceTabs = !!data.match(/^  \S/)
+  var lastTabLevel = null
+  data = data.split("\n").map( (x) => {
+    var tablevel = getTabLevel(x, hasTwoSpaceTabs)
+    x = x.trim()
+    if (lastTabLevel != null && x != "") {
+      if (lastTabLevel > tablevel)  x = "^"+x
+      if (lastTabLevel == tablevel) x = "+"+x
+      if (lastTabLevel < tablevel)  x = ">"+x
+    }
+    lastTabLevel = tablevel + countTokens(str, ">") - countTokens(str, "^")
+    return x
+  }).join('')
+
+  try {
+    var out = emmet
+    .expandAbbreviation(data)
+    .replace(/\$\{\d+\:?\w*}/g, "")
+    .replace(/NOREP_VAR/g, "$")
+    output(out,filename)
+  } catch(e) {
+    console.log("error parsing template.\nattempted to parse: \n",data)
+  }
+}
+
+newExtension = (filename) => {
+  var hasext = !!filename.match(/\.\w\w\w\w?$/)
+  if (hasext) filename = filename.replace(/\.\w\w\w\w?$/,".html")
+  else filename += ".html"
+  return filename
+}
+
+finished=0
+output=(out,filename)=> {
+  //if outputfiles well use those
+  if(argv['o']){
+    var files=argv['o'].split(',')
+    var f = files[finished]
+    if (f){
+       writeFile(out, f)
+       return finished++
+    }
+  }
+  //if parsing file we'll output to filenames .html
+  if(argv['_'].length > 0)
+    writeFile(out, newExtension(filename))
+  else  // print
+    console.log(out)
+}
+
+writeFile=(txt,file)=> {
+  fs.writeFile(file, txt, (err) => {
+    if (err) console.log(err)
+  })
+}
+
+//read stdin
+stdin=()=> {
+  if(Boolean(process.stdin.isTTY))
+    return false // no stdin
+  process.stdin.setEncoding('utf8')
+  var buffer = "",s = process.openStdin()
+  s.on('data', (buff) => { if(buff) buffer += buff.toString() })
+  s.on('end', () => parse(buffer,"") )
+  return true
+}
+
+//help
+var desc = `emmetp
+A Template language of emmet shorthand`
+
+var opts = `
+usage: emmetp [files] [-o outputfile1[,outputfile2]]
+ex:    emmetp temp1.tmpl temp2.tmpl       # creates temp1.html and temp2.html from two templates
+ex:    cat file1 | emmetp > newfile.html  # create template from stdin
+
+syntax example:
+
+       #app
+           button.btn{Hello \\$someVar or {{ \\$handlebars }} }
+           div#id.class>ul>li.item$\{or one line... this is item #$}*4
+           (li+.div)*4
+`
+//cmd line
+if(argv['_'].length) //process files
+   for(i in argv['_'])
+    parseFile(argv['_'][i])
+else 
+   if(!stdin())
+   console.log(desc + "\n" + opts)
