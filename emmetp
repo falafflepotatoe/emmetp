@@ -24,7 +24,7 @@ getTabLevel = (str,boolTwoSpaceTabs) => {
   return 0 // default is zero
   }
 }
-
+repeat = (char, n) => { var out = ""; for(var i=0; i<n; i++) out+=char; return out; }
 
 // parse
 parseFile = (filename) => {
@@ -48,7 +48,7 @@ parse = (str,filename) => {
     var tablevel = getTabLevel(x, hasTwoSpaceTabs)
     x = x.trim()
     if (lastTabLevel != null && x != "") {
-      if (lastTabLevel > tablevel)  x = "^"+x
+      if (lastTabLevel > tablevel)  x = repeat("^", lastTabLevel-tablevel)+x
       if (lastTabLevel == tablevel) x = "+"+x
       if (lastTabLevel < tablevel)  x = ">"+x
     }
