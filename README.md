@@ -52,6 +52,7 @@ Feel free to send a pull request.
 Todo list:
 
 * [ ] Make NPM installable
+* [ ] Should be able to write raw javascript somewhere in the template file
 
 ### License (MIT)
 The MIT License (MIT)
