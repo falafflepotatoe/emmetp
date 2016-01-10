@@ -32,7 +32,7 @@ parseFile = (filename) => {
   try {
     data = fs.readFileSync(filename, 'UTF-8')
   } catch (e) {
-    return console.log("error reading file '"+filename+"'")
+    return console.error("error reading file '"+filename+"'")
   }
   parse(data, filename)
 }
@@ -63,7 +63,7 @@ parse = (str,filename) => {
     .replace(/NOREP_VAR/g, "$")
     output(out,filename)
   } catch(e) {
-    console.log("error parsing template.\nattempted to parse: \n",data)
+    console.error("error parsing template.\nattempted to parse: \n",data)
   }
 }
 
@@ -94,7 +94,7 @@ output=(out,filename)=> {
 
 writeFile=(txt,file)=> {
   fs.writeFile(file, txt, (err) => {
-    if (err) console.log(err)
+    if (err) console.error("error writing file '"+file+"'")
   })
 }
 
@@ -127,8 +127,8 @@ syntax example:
 `
 //cmd line
 if(argv['_'].length) //process files
-   for(i in argv['_'])
+  for(i in argv['_'])
     parseFile(argv['_'][i])
 else 
-   if(!stdin())
-   console.log(desc + "\n" + opts)
+  if(!stdin())
+    console.log(desc + "\n" + opts)
