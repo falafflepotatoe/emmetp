@@ -32,7 +32,8 @@ parseFile = (filename) => {
   try {
     data = fs.readFileSync(filename, 'UTF-8')
   } catch (e) {
-    return console.error("error reading file '"+filename+"'")
+    console.error("error reading file '"+filename+"'")
+    return process.exit(1)
   }
   parse(data, filename)
 }
@@ -64,6 +65,7 @@ parse = (str,filename) => {
     output(out,filename)
   } catch(e) {
     console.error("error parsing template.\nattempted to parse: \n",data)
+    process.exit(1)
   }
 }
 
@@ -94,7 +96,10 @@ output=(out,filename)=> {
 
 writeFile=(txt,file)=> {
   fs.writeFile(file, txt, (err) => {
-    if (err) console.error("error writing file '"+file+"'")
+    if (err) {
+      console.error("error writing file '"+file+"'")
+      process.exit(1)
+    }
   })
 }
 
