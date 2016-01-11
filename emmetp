@@ -53,7 +53,7 @@ parse = (str,filename) => {
       if (lastTabLevel == tablevel) x = "+"+x
       if (lastTabLevel < tablevel)  x = ">"+x
     }
-    lastTabLevel = tablevel + countTokens(str, ">") - countTokens(str, "^")
+    lastTabLevel = tablevel + countTokens(x, ">") - countTokens(x)
     return x
   }).join('')
 
