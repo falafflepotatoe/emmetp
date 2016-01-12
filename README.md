@@ -10,15 +10,19 @@ If you need a $ be sure to escape it `\$` ... emmet uses $ for item number (ex: 
 
 Example:
 
-    !
-         #app
-              button.btn{Hello \$someVar or {{ \$handlebars }} }
-              ul>li.item${or one line... this is item #$}*4
-         #footer
-              
+	!
+		#app
+			button.btn{Hello \$someVar or {{ \$handlebars }} }
+			ul>li.item${or one line... this is item #$}*4
+		#footer
+		script[type="text/javascript"]&
+			console.log("inline text with the new & operator")
+			console.log("use - to end the block")
+		-
+			  
 Put it all on one line if you want:
 
-    !>#app>button.btn{hello \$someVar}+ul>li*4{item #$}^^#footer
+	!>#app>button.btn{hello \$someVar}+ul>li*4{item #$}^^#footer
 
 emmet cheat sheat is available: [here](http://docs.emmet.io/cheat-sheet/)
 
@@ -30,21 +34,23 @@ Put the script somewhere, and `chmod u+x emmetp`
 
 Then install the deps: 
 
-    npm install emmet minimist -g
-    #note: use -g for global, but it didnt work on my install... it should though.
+	npm install emmet minimist -g
+	#note: use -g for global, but it didnt work on my install... it should though.
 
 ### Usage
 
 Any one will do
 
-    cat myTemplate.file | emmetp > outputFile.html
-    cat myTemplate.file | emmetp -o outputFile.html 
-    emmetp file1.tmpl -o outputFile.html
-    emmetp file1.tmpl file2.tmpl   # creates file1.html and file2.html
+	cat myTemplate.file | emmetp > outputFile.html
+	cat myTemplate.file | emmetp -o outputFile.html 
+	emmetp file1.tmpl -o outputFile.html
+	emmetp file1.tmpl file2.tmpl   # creates file1.html and file2.html
 
 If no output file is named emmetp will use the old file name and a new extension of '.html'.
 
 Piping `cat file | emmetp` will cause emmetp to print the results.
+
+`-h` for help and `-p` for print.
 
 ### Contribute
 Feel free to send a pull request.
@@ -52,7 +58,7 @@ Feel free to send a pull request.
 Todo list:
 
 * [ ] Make NPM installable
-* [ ] Should be able to write raw javascript somewhere in the template file
+* [X] Should be able to write raw javascript somewhere in the template file
 
 ### License (MIT)
 The MIT License (MIT)
