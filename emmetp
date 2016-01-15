@@ -2,163 +2,209 @@
 var fs  = require('fs'),
 emmet   = require('emmet'),
 process = require('process'),
-argv    = require('minimist')(process.argv.slice(2));
+os      = require('os'),
+path    = require('path'),
+spawn   = require('child_process').spawnSync,
+argv    = require('minimist')(process.argv.slice(2), { boolean: ['p','h','--help','?'] });
 argv.o  = argv.o ? argv.o.split(',') : [];  // "-o outfile1,outfile2"
+
+// optional stuff for using a preprocessor:
+var whitelist = {}, 
+    exampleconfig = { coffee: { args: ["-b","-c","-s","-p"] } };
 
 // two fns for counting single line nest tokens (div.a>div.b^div.c)
 function countChar(str,a) {
-  var n=0;
-  for(var i in str) if(str[i]==a) n++; 
-  return n;
+    var n=0;
+    for(var i in str) if(str[i]==a) n++; 
+    return n;
 }
+
 function countTokens(str,a) {
-  return countChar(
-  (""+str)
-  .replace(/[^\\]?".+?[^\\]"/g)  // dont count >^ in quotes or curlys ex: div{>>> my h^t^m^l >>>}
-  .replace(/[^\\]?'.+?[^\\]'/g)
-  .replace(/[^\\]?\{.+?[^\\]\}/g)
-  , a);
+    return countChar(
+    (""+str)
+    .replace(/[^\\]?".+?[^\\]"/g)  // dont count >^ in quotes or curlys ex: div{>>> my h^t^m^l >>>}
+    .replace(/[^\\]?'.+?[^\\]'/g)
+    .replace(/[^\\]?\{.+?[^\\]\}/g)
+    , a);
 }
 // # of actual tabs and spaces at the start of the line
 function getTabLevel(str,boolTwoSpaceTabs) {
-  try {
-    if (!boolTwoSpaceTabs)
-      str=str.replace(/ {4}/g,"\t");
-    return str.replace(/ {2}/g,"\t").match(/^\t+/)[0].length; // # of tabs before text
-  } catch (e) {
-    return 0;  // default is zero
-  }
+    try {
+        if (!boolTwoSpaceTabs)
+            str=str.replace(/ {4}/g,"\t");
+        return str.replace(/ {2}/g,"\t").match(/^\t+/)[0].length; // # of tabs before text
+    } catch (e) {
+        return 0;  // default is zero
+    }
 }
 // repeat a char N times
 function repeat(char, n) {
-  var out = "";
-  for(var i=0; i<n; i++) out+=char;
-  return out;
+    for(var out="";n>0;n--)
+        out+=char;
+    return out;
 }
 //error handler
 function giveup(error) {
-  console.error(error);
-  process.exit(1);
+    console.error(error);
+    process.exit(1);
 }
+//trim return not tab
 function trim(str) {
-  return str.replace(/\n+$/g, "").replace(/^\n+/g, "");
+    return str.replace(/(\r?\n)+$/g, "").replace(/^(\r?\n)+/g, "");
+}
+function _quote(str) {
+    return "'"+str+"'";
+}
+
+// read config if have one (only needed for preprocessors)
+function readConfig(){
+    try {
+        var configFile = os.homedir() + path.sep + ".config" + path.sep + "emmetp";  // ex: "~/.config/emmetp"
+        whitelist = JSON.parse(fs.readFileSync(configFile));
+    } catch(e) { /* totally optional nothing to do here */ }
+}
+
+function execPreProcessor(parser, txt) {
+    var config = whitelist[parser] || {}, args = config.args || [];
+    // sanity checking and whitelist checking
+    if (parser.trim() == "")
+        return txt;  // nothing to do
+    if (typeof whitelist[parser] != 'object')
+        return giveup("parser " +_quote(parser)+ " not in whitelist, you must add to ~/.config/emmetp  \n  the config file should be a JSON object (whitespace is ok), ex:  \n  "+ JSON.stringify(exampleconfig));
+    if (parser.match(/(;|&&|\|\|)/) || args.join('').match(/(;|&&|\|\|)/))  // / not super safe but some sanity for &&;|| (multi cmds in one)
+        return giveup("parser cmd: " +_quote(parser)+ " does not pass the whitelist test");
+
+    //launch coffeescript/stylus/whatever, expect errors!
+    try {
+        var s = spawn(parser, args, {input: txt +"\n"});
+        if(typeof s.error != 'undefined' && s.error)
+            return giveup("error exec'ing parser: " +_quote(parser)+ ":\nError: " +s.error+"\n"+ String(s.stderr));
+        if(s.status || String(s.stderr))
+            return giveup("error exec'ing parser: " +_quote(parser)+ ":\n"+String(s.stderr)); // error code 1 or stderr
+
+        return String(s.stdout);
+    } catch(e) {
+        return giveup("error exec'ing " +_quote(parser)+ ", arguments array: [" +args.valueOf()+ "] \n\n" + e);
+    }
 }
 
 // parseFile
 function parseFile(filename) {
-  var data;
-  try {
-    data = fs.readFileSync(filename, 'UTF-8');
-  } catch (e) {
-    return giveup("error reading file '"+filename+"'");
-  }
-  parse(data, filename);
+    var data;
+    try {
+        data = fs.readFileSync(filename, 'UTF-8');
+    } catch (e) {
+        return giveup("error reading file "+_quote(filename));
+    }
+    parse(data, filename);
 }
 
 //grab "&\n" + text. new feature for inline javascript
 function extractInlineBlocks(str) {
-  var extractedText = [], parsers = [];  // a store for inline JS and text
-  //regex for &(coffee|babel)?:? \n (text) - \n
-  var match = [], r = /&(\w+:)?\r?\n((\r?\n|.)+?)\r?\n\s*-\r?\n/gm;
-  while (match = r.exec(str)) {
-    parsers.push(match[1] ? match[1].replace(":",'').trim() : "");
-    extractedText.push("\n" + match[2] + "\n");
-  }
-  str = str.replace(r, "{NOREP_INLINE_HERE}\n");
-  if (countTokens(str,"&") > 0)
-    return giveup("error with '&', parser app is missing a ':' after parser name, or closing - (and a line return after - ).");
-  return { output: str, extracted: extractedText, parsers: parsers };
+    var extractedText = [], parsers = [];  // a store for inline JS and text
+    //regex for &(coffee|babel): \n (text) - \n  (and the coffee: is optional)
+    var match = [], r = /&(\w+:)?\r?\n((\r?\n|.)+?)\r?\n\s*-$/gm;
+    while (match = r.exec(str)) {
+        parsers.push(match[1] ? match[1].replace(":",'').trim() : "");
+        extractedText.push("\n" +match[2]+ "\n");
+    }
+    str = str.replace(r, "{NOREP_INLINE_HERE}\n");
+    if (countTokens(str,"&") > 0)
+        return giveup("error with '&', parser app is missing a ':' after parser name, or closing '-'");
+
+    return { output: str, extracted: extractedText, parsers: parsers };
 }
 
 //make `^>+` out of tabs (normally emmet does nesting like "div.a>div.b" and unnesting like "div.b^div.a_sibling", now we can use tabs)
 function extractTabs(str) {
-  var lastTabLevel = null;
-  var hasTwoSpaceTabs = !!str.match(/^  \S/);
-  var data = str.split("\n").map( (x) => {
-    var tablevel = getTabLevel(x, hasTwoSpaceTabs);
-    var original = x;
-    x = x.trim();
-    if (lastTabLevel != null && x != "") {
-      if (tablevel > lastTabLevel)  x = ">"+x;
-      if (tablevel == lastTabLevel) x = "+"+x;
-      if (tablevel < lastTabLevel)  x = repeat("^", lastTabLevel-tablevel)+x;
-    }
-    lastTabLevel = tablevel + countTokens(original, ">") - countTokens(original, "^");
-    return x;
-  }).join('');
-  return data;
+    var lastTabLevel = null;
+    var hasTwoSpaceTabs = !!str.match(/^ {2}\S/);
+    var data = str.split("\n").map( (x,i) => {
+        var tablevel = getTabLevel(x, hasTwoSpaceTabs);
+        var original = x;
+        x = x.trim(); // emmet throws an error for blank lines
+        if (lastTabLevel != null && x != "") {
+            if (tablevel > lastTabLevel)  x = ">"+x;
+            if (tablevel == lastTabLevel) x = "+"+x;
+            if (tablevel < lastTabLevel)  x = repeat("^", lastTabLevel-tablevel)+x;
+        }
+        if (x != "")
+            lastTabLevel = tablevel + countTokens(original, ">") - countTokens(original, "^");
+        return x;
+    }).join('');
+    return data;
 }
 
 // parse text. note for parsing we use NOREP_VAR and NOREP_INLINE_HERE to indicate where we made changes to the blob
 function parse(str,filename) {
-  // escape "\$" ex: \$varname
-  var data = str.replace(/\\\$/gm,"NOREP_VAR");
-  // extract inline js ex: &\n text \n -
-  var codeblocks = extractInlineBlocks(data);
-  data = codeblocks.output;  // the new template
-  // convert tabs to >^+
-  data = extractTabs(data);
-
-  try {
-    var id = 0;
-    var out = emmet
-    .expandAbbreviation(data)
-    .replace(/\$\{\d+\:?\w*?}/g, "")  // dont need these (emmets tab spots for sublime) ex: {$0:label}
-    .replace(/NOREP_VAR/g, "$")       // \$variables
-    .split('\n').map( (x) => {        // inline blocks and tabs for the closing html tag ex: &\n java();
-      return x.indexOf("NOREP_INLINE_HERE") != -1 ?
-        x.replace("NOREP_INLINE_HERE", 
-                  "\n"
-                  + trim(codeblocks.extracted[id++])
-                  + "\n"
-                  + repeat("\t", getTabLevel(x, false)) )
-                   : x;
-    }).join("\n");
-    output(out,filename);
-  } catch(e) {
-    giveup("error parsing template"+(filename ? " '"+filename+"'" : "")+".\nattempted to parse: \n"+data);
-  }
+    // escape "\$" ex: \$varname
+    var data = str.replace(/\\\$/gm,"NOREP_VAR");
+    // extract inline js ex: &\n text \n -
+    var codeblocks = extractInlineBlocks(data);
+    data = codeblocks.output;  // the new template
+    // convert tabs to >^+
+    data = extractTabs(data);
+    try {
+        var id = 0;
+        var out = emmet
+        .expandAbbreviation(data)
+        .replace(/\$\{\d+\:?\w*?}/g, "")  // dont need these (emmets tab spots for sublime) ex: {$0:label}
+        .replace(/NOREP_VAR/g, "$")       // \$variables
+        .split('\n').map( (x) => {        // inline blocks ex: script&\n java();
+            return x.indexOf("NOREP_INLINE_HERE") != -1 ?
+                x.replace("NOREP_INLINE_HERE", 
+                "\n"
+                + execPreProcessor(codeblocks.parsers[id], trim(codeblocks.extracted[id++]))  // todo low: trim should help for jade/stylus. but removing it maybe you can get line perfect output to preprocessors
+                + "\n"
+                + repeat("\t", getTabLevel(x, false)) ) // tab for html, so they match!
+                : x;
+        }).join("\n");
+        output(out,filename);
+    } catch(e) {
+        giveup("error parsing template"+(filename ? _quote(filename) : "")+".\nattempted to parse: \n"+_quote(data) + "\n\n Error: "+e);
+    }
 }
 
-function newExtension(filename) {  // simple version, i only need .tmpl => .html
-  var hasext = !!filename.match(/\.\w\w\w\w?$/);
-  if (hasext) filename = filename.replace(/\.\w\w\w\w?$/,".html");
-  else filename += ".html";
-  return filename;
+function newExtension(filename) {
+    var hasext = !!filename.match(/\.\w\w\w\w?$/);
+    if (hasext) filename = filename.replace(/\.\w\w\w\w?$/,".html");
+    else filename += ".html";
+    return filename;
 }
 
-function output(out,filename) {
-  if(argv.p)  // print flag -p
-    console.log(out);
-  else if(argv.o && argv.o.length)  // if output files well use those (-o outfile1,outfile2)
-    writeFile(out, argv.o.shift());
-  else if(argv._.length > 0)        // if we were parsing files we'll output to filenames .html
-    writeFile(out, newExtension(filename));
-  else  // output to stdin (could not figure out filename or extension)
-    console.log(out);
+function output(out, filename) {
+    if(argv.p)                        // print flag -p
+        console.log(out);
+    else if(argv.o && argv.o.length)  // if output files well use those (-o outfile1,outfile2)
+        writeFile(out, argv.o.shift());
+    else if(argv._.length > 0)        // if we were parsing files we'll output to filenames .html
+        writeFile(out, newExtension(filename));
+    else                              // output to stdin (could not figure out filename or extension)
+        console.log(out);
 }
 
 function writeFile(txt,file) {
-  fs.writeFile(file, txt, function(err) {
-    if (err)
-      giveup("error writing file '"+file+"'");
-  })
+    fs.writeFile(file, txt, function(err) {
+        if (err)
+            giveup("error writing file "+_quote(file));
+    })
 }
 
 //read stdin
 function stdin() {
-  if(!!process.stdin.isTTY)
-    return false; // no stdin
-  process.stdin.setEncoding('utf8');
-  var buffer = "",s = process.openStdin();
-  s.on('data', (buff) => { if(buff) buffer += buff.toString(); });
-  s.on('end', () => parse(buffer,"") );
-  return true;
+    if(Boolean(process.stdin.isTTY))
+        return false; // no stdin
+    process.stdin.setEncoding('utf8');
+    var buffer = "",s = process.openStdin();
+    s.on('data', (buff) => { if(buff) buffer += buff.toString(); });
+    s.on('end', () => parse(buffer,"") );
+    return true;
 }
 
 //help
-var desc = "emmetp  \nA Template language of emmet shorthand";
-var opts = `
+var desc = `emmetp
+
+A Template language of emmet shorthand
 usage: emmetp [-ph] [files] [-o outputfile1[,outputfile2]]
 
 -p  print
@@ -168,20 +214,27 @@ ex:  emmetp temp1.tmpl temp2.tmpl       # creates temp1.html + temp2.html
 ex:  cat file1 | emmetp > newfile.html  # process template from stdin
 
 syntax example:
-       #app
-           button.btn{Hello \\$someVar or {{ \\$handlebars }} }
-           div#id.class>ul>li.item\${or one line... this is item #$}*4
-           (label+span[attr1=ok])*4
-       script&
-          console.log(" raw JS via '&' ")
-       -
+    #app
+        button.btn{Hello \\$someVar or {{ \\$handlebars }} }
+        div>ul>li.item\${or one line. this is item #$}*4
+        div#id.class
+            (label{10 labels and 10 spans!}+span[attr1=ok])*10
+        script&
+            console.log(" raw JS via '&' ")
+        -
+        script&coffee:
+            console.log "or use a preprocessor like coffeescript or stylus via '&app:'"
+        -
 `;
+
 //cmd line
+readConfig();
 if (argv.h || argv.help || argv['?'])  //help
-  return console.log(desc + "\n" + opts);
+    console.log(desc);
+
 else if(argv._.length)  // process files
-  for(var i in argv._)
-    parseFile(argv._[i]);
+    for(var i in argv._)
+        parseFile(argv._[i]);
+
 else if(!stdin())      // or read stdin or print help if nothing to do
-  console.log(desc + "\n" + opts);
-  
+    console.log(desc);

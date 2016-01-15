@@ -1,0 +1,30 @@
+{
+    "name": "emmetp",
+    "description": "emmet template language",
+    "keywords": ["emmet","template","html","compiler","preprocessor"],
+    "author": "falafflepotatoe",
+    "version": "0.9.0",
+    "license": "MIT",
+    "engines": {
+        "node": ">=4.2.1"
+    },
+    "bin": {
+        "emmetp": "./emmetp"
+    },
+    "preferGlobal": true,
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "bugs": {
+        "url": "https://github.com/falafflepotatoe/emmetp/issues"
+    },
+    "homepage": "https://github.com/falafflepotatoe/emmetp#readme",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/falafflepotatoe/emmetp.git"
+    },
+    "devDependencies": {
+        "emmet": ">=1.2.0",
+        "minimist": ">=1.0.0"
+    }
+}
