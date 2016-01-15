@@ -8,6 +8,8 @@ Now you can use tabs for nesting (not `^+>` ... they still work though!)
 
 If you need a $ be sure to escape it `\$` ... emmet uses $ for item number (ex: item.num$*5)
 
+If you want to inline some text like javascript use `&` at the end of the tag (ex: `script&`) and `-` on a line alone to close the block.
+
 Example:
 
 	!
@@ -22,13 +24,41 @@ Example:
 			  
 Put it all on one line if you want:
 
-	!>#app>button.btn{hello \$someVar}+ul>li*4{item #$}^^#footer
+	!>#app>button.btn{hello \$someVar}+ul>li*4{item #$}^^#footer+script&
+	console.log('hello world')
+	-
 
 emmet cheat sheat is available: [here](http://docs.emmet.io/cheat-sheet/)
+
+#### Inline JS
+
+Want babel or coffeescript (or stylus/sass/whatever)? Use & ex: `script&appname:` and close with a `-` on its own line. Example:
+
+	#app
+		button.btn1+button.btn2
+	script[src=jquery.js]
+	
+	script&coffee:
+		$ ->
+			$('.btn1').click () -> console.log 'hello world'
+			$('.btn2').click () -> console.log 'from coffeescript'
+	-
+	#footer
+
+Note: You will have to create a whitelist file `~/.config/emmetp` and add your preprocessors to it, It should be a valid JSON object. example: 
+
+	{
+		"coffee": { "args": ["-b","-c","-s","-p"] },
+		"babel": { "args": ["-p","--blacklist","strict"] }
+	}
 
 ### Install
 
 Requires nodejs
+
+Via npm: `npm install emmetp -g`
+
+**Manual:**
 
 Put the script somewhere, and `chmod u+x emmetp`
 
@@ -39,12 +69,14 @@ Then install the deps:
 
 ### Usage
 
-Any one will do
+usage: `emmetp [-ph] [files] [-o outputfile1[,outputfile2]]`
 
+Any one will do:
+
+	emmetp file1.tmpl file2.tmpl   # creates file1.html and file2.html
+	emmetp file1.tmpl -o outputFile.html
 	cat myTemplate.file | emmetp > outputFile.html
 	cat myTemplate.file | emmetp -o outputFile.html 
-	emmetp file1.tmpl -o outputFile.html
-	emmetp file1.tmpl file2.tmpl   # creates file1.html and file2.html
 
 If no output file is named emmetp will use the old file name and a new extension of '.html'.
 
@@ -57,7 +89,7 @@ Feel free to send a pull request.
 
 Todo list:
 
-* [ ] Make NPM installable
+* [X] Make NPM installable
 * [X] Should be able to write raw javascript somewhere in the template file
 
 ### License (MIT)
@@ -69,4 +101,3 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
