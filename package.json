@@ -3,7 +3,7 @@
     "description": "emmet template language",
     "keywords": ["emmet","template","html","compiler","preprocessor"],
     "author": "falafflepotatoe",
-    "version": "0.9.0",
+    "version": "0.9.1",
     "license": "MIT",
     "engines": {
         "node": ">=4.2.1"
