@@ -23,7 +23,7 @@
         "type": "git",
         "url": "git://github.com/falafflepotatoe/emmetp.git"
     },
-    "devDependencies": {
+    "dependencies": {
         "emmet": ">=1.2.0",
         "minimist": ">=1.0.0"
     }
