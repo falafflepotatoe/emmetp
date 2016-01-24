@@ -166,8 +166,8 @@ function parse(str,filename) {
 }
 
 function newExtension(filename) {
-    var hasext = !!filename.match(/\.\w\w\w\w?$/);
-    if (hasext) filename = filename.replace(/\.\w\w\w\w?$/,".html");
+    var hasext = !!filename.match(/\.\w\w?\w?\w?$/);
+    if (hasext) filename = filename.replace(/\.\w\w?\w?\w?$/,".html");
     else filename += ".html";
     return filename;
 }
