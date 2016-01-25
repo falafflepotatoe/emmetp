@@ -71,7 +71,7 @@ function execPreProcessor(parser, txt) {
         return txt;  // nothing to do
     if (typeof whitelist[parser] != 'object')
         return giveup("parser " +_quote(parser)+ " not in whitelist, you must add to ~/.config/emmetp  \n  the config file should be a JSON object (whitespace is ok), ex:  \n  "+ JSON.stringify(exampleconfig));
-    if (parser.match(/(;|&&|\|\|)/) || args.join('').match(/(;|&&|\|\|)/))  // / not super safe but some sanity for &&;|| (multi cmds in one)
+    if (parser.match(/(;|&|\|)/) || args.join('').match(/(;|&|\|)/))  // / not super safe but some sanity for |&;&&|| (multi cmds in one)
         return giveup("parser cmd: " +_quote(parser)+ " does not pass the whitelist test");
 
     //launch coffeescript/stylus/whatever, expect errors!
