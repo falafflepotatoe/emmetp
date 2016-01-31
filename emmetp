@@ -22,9 +22,9 @@ function countChar(str,a) {
 function countTokens(str,a) {
     return countChar(
     (""+str)
-    .replace(/[^\\]?".+?[^\\]"/g)  // dont count >^ in quotes or curlys ex: div{>>> my h^t^m^l >>>}
-    .replace(/[^\\]?'.+?[^\\]'/g)
-    .replace(/[^\\]?\{.+?[^\\]\}/g)
+    .replace(/[^\\]?".+?[^\\]"/g, "")  // dont count >^ in quotes or curlys ex: div{>>> my h^t^m^l >>>}
+    .replace(/[^\\]?'.+?[^\\]'/g, "")
+    .replace(/[^\\]?\{.+?[^\\]\}/g, "")
     , a);
 }
 // # of actual tabs and spaces at the start of the line
